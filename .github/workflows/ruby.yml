@@ -1,6 +1,6 @@
 name: ruby-switch
 
-# Experimento del hito 2, paso 1: intentar compilar Ruby 3.1 para la Switch.
+# Experimento del hito 1, paso 1: intentar compilar Ruby 3.1 para la Switch.
 # Se lanza a mano desde la pestaña Actions -> ruby-switch -> Run workflow.
 # Pase lo que pase, al final guarda los registros (logs) para descargarlos.
 
