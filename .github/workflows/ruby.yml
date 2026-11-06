@@ -1,0 +1,65 @@
+name: ruby-switch
+
+# Experimento del hito 2, paso 1: intentar compilar Ruby 3.1 para la Switch.
+# Se lanza a mano desde la pestaña Actions -> ruby-switch -> Run workflow.
+# Pase lo que pase, al final guarda los registros (logs) para descargarlos.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ruby:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkita64:latest
+    steps:
+      - name: Instalar herramientas
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ruby bison autoconf automake libtool curl xz-utils ca-certificates make file
+          ruby -v
+          mkdir -p "$GITHUB_WORKSPACE/logs"
+
+      - name: Descargar Ruby 3.1
+        run: |
+          curl -fsSL https://cache.ruby-lang.org/pub/ruby/3.1/ruby-3.1.6.tar.xz -o ruby.tar.xz
+          tar xf ruby.tar.xz
+
+      - name: Configurar
+        run: |
+          set -o pipefail
+          export PATH="$DEVKITPRO/devkitA64/bin:$PATH"
+          cd ruby-3.1.6
+          ./configure \
+            --host=aarch64-none-elf \
+            --build="$(./tool/config.guess)" \
+            --with-baseruby="$(which ruby)" \
+            --prefix=/opt/ruby-nx \
+            --disable-shared --enable-static \
+            --disable-install-doc --disable-install-rdoc \
+            --disable-rubygems --without-gmp --without-openssl \
+            --with-static-linked-ext \
+            CC=aarch64-none-elf-gcc \
+            CFLAGS="-O2 -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -D__SWITCH__ -I$DEVKITPRO/libnx/include" \
+            LDFLAGS="-specs=$DEVKITPRO/libnx/switch.specs -L$DEVKITPRO/libnx/lib" \
+            LIBS="-lnx" 2>&1 | tee "$GITHUB_WORKSPACE/logs/1-configure.txt"
+
+      - name: Compilar miniruby
+        run: |
+          set -o pipefail
+          export PATH="$DEVKITPRO/devkitA64/bin:$PATH"
+          cd ruby-3.1.6
+          make -j"$(nproc)" miniruby 2>&1 | tee "$GITHUB_WORKSPACE/logs/2-make.txt"
+
+      - name: Guardar registros
+        if: always()
+        run: |
+          cp ruby-3.1.6/config.log logs/config.log 2>/dev/null || true
+          tail -n 200 logs/1-configure.txt > logs/resumen-configure.txt 2>/dev/null || true
+          tail -n 200 logs/2-make.txt > logs/resumen-make.txt 2>/dev/null || true
+
+      - name: Subir registros
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: registros-ruby
+          path: logs/
